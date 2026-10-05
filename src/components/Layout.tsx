@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { NavLink, Outlet } from 'react-router-dom'
-import { LayoutDashboard, ClipboardList, Scale, FileSignature, Banknote, Receipt, ArrowLeftRight, ShieldCheck, Lock, Truck, LogOut, Menu, X } from 'lucide-react'
+import { LayoutDashboard, ClipboardList, Scale, FileSignature, Banknote, Receipt, ArrowLeftRight, ShieldCheck, Lock, Truck, Users, UserCog, LogOut, Menu, X } from 'lucide-react'
 import { useAuth } from '../auth'
 import { useCycle, useRealtime } from '../lib/data'
 import { ROLE_LABEL, type Role } from '../lib/supabase'
@@ -15,6 +15,7 @@ const NAV: { to: string; label: string; icon: typeof Menu; roles: Role[] }[] = [
   { to: '/comptes', label: "Comptes d'emploi", icon: ShieldCheck, roles: ['CHEF', 'RM', 'DML', 'CG', 'DG', 'ADMIN'] },
   { to: '/cloture', label: 'Clôture', icon: Lock, roles: ['DML', 'CG', 'DG', 'ADMIN'] },
   { to: '/fournisseurs', label: 'Fournisseurs', icon: Truck, roles: ['CHEF', 'RM', 'DML', 'CG', 'DG', 'TRES', 'ADMIN'] },
+  { to: '/utilisateurs', label: 'Utilisateurs', icon: Users, roles: ['DML', 'DG', 'ADMIN'] },
   { to: '/reaffectations', label: 'Réaffectations', icon: ArrowLeftRight, roles: ['CHEF', 'RM', 'DML', 'DG', 'ADMIN'] }
 ]
 
@@ -90,6 +91,9 @@ export default function Layout() {
       <div className="px-4 pt-4 mt-4 border-t border-white/10">
         <p className="text-white text-sm font-medium truncate">{profile!.nom}</p>
         <p className="text-brand-100 text-xs mb-3">{ROLE_LABEL[profile!.role]}{profile!.agence_code ? ` · ${profile!.agence_code}` : ''}</p>
+        <NavLink to="/compte" onClick={() => setOpen(false)} className="flex items-center gap-2 text-sm text-brand-100 hover:text-white mb-2">
+          <UserCog size={16} /> Mon compte
+        </NavLink>
         <button onClick={signOut} className="flex items-center gap-2 text-sm text-brand-100 hover:text-white">
           <LogOut size={16} /> Se déconnecter
         </button>

@@ -22,7 +22,8 @@ Les autres comptes se créent ensuite avec leur rôle (CHEF, RM, DML, CG, DG, TR
 `supabase/tests/test_besoins.sql` couvre les fiches de besoin.
 `supabase/tests/test_referentiels.sql` (après `seed_referentiels.sql`) couvre les référentiels.
 `supabase/tests/test_catalogue.sql` couvre le catalogue fournisseurs.
-Dernier résultat : 134 scénarios réussis (45 + 28 + 9 + 17 + 12 + 23), 0 échec.
+`supabase/tests/test_comptes.sql` couvre les mots de passe. Toute la suite : `bash supabase/tests/lancer_tests.sh` (Docker).
+Dernier résultat : 165 scénarios réussis (45 + 28 + 9 + 17 + 12 + 23 + 31), 0 échec.
 
 ## Règles à valider (voir l'analyse du cahier des charges)
 - `seuil_reaf_dg` (2 000 000 FCFA) est **provisoire** : le cahier des charges ne le chiffre pas.
@@ -53,3 +54,9 @@ Rapport affiché par le script : sites inconnus, codes écartés, quasi-doublons
 Page « Fournisseurs » : fiche fiscale (NIU, RCCM, régime, TVA…), articles et prix, historique des prix,
 comparaison entre fournisseurs. Modèle Excel : `public/modeles/Modele_fournisseurs_articles.xlsx`
 (régénérable avec `python scripts/generer_modele_fournisseurs.py`). Import atomique par la DML.
+
+## Mots de passe
+- Chacun change le sien depuis « Mon compte » (le mot de passe actuel est redemandé).
+- DML et DG réinitialisent les comptes des agences (page « Utilisateurs ») ; l'administrateur réinitialise tous les comptes.
+  Mot de passe temporaire affiché une seule fois, changement obligatoire à la reconnexion (vérifié par la base),
+  sessions coupées, opération tracée à l'historique. Le contrôle de gestion n'a pas ce droit (séparation des tâches).

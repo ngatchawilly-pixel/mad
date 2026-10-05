@@ -2,7 +2,7 @@ import { createContext, useContext, useEffect, useState, type ReactNode } from '
 import type { Session } from '@supabase/supabase-js'
 import { supabase, type Role, type Row } from './lib/supabase'
 
-type Profile = { id: string; nom: string; role: Role; agence_code: string | null }
+type Profile = { id: string; nom: string; role: Role; agence_code: string | null; doit_changer_mdp: boolean }
 type Ctx = {
   session: Session | null
   profile: Profile | null

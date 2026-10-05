@@ -2,6 +2,8 @@
 -- Crée : chef et responsable maintenance pour chaque entité de la table agences, + DML, CG, DG, Trésorerie.
 -- Les comptes déjà existants (même e-mail) sont ignorés. Mots de passe aléatoires, affichés à la fin.
 -- À NOTER IMMÉDIATEMENT : ils ne sont pas relisibles ensuite (seul le hachage est conservé).
+-- Chaque compte créé devra changer son mot de passe à la première connexion (migration 10 requise).
+-- Mot de passe perdu : la direction (DML, DG) le réinitialise depuis la page Utilisateurs de l'application.
 
 create temp table _comptes_crees(email text, mot_de_passe text, role text, agence text);
 
@@ -41,8 +43,19 @@ begin
     insert into profiles(id, nom, role, agence_code) values (v_uid, r.nom, r.role, r.agence)
     on conflict (id) do nothing;
 
+    -- changement obligatoire à la première connexion, vérifié par la base
+    update profiles set doit_changer_mdp = true where id = v_uid;
+    insert into mdp_reinitialisations(user_id, hash)
+    select id, encrypted_password from auth.users where id = v_uid;
+
     insert into _comptes_crees values (v_email, v_mdp, r.role::text, r.agence);
   end loop;
 end $$;
 
 select email, mot_de_passe, role, agence from _comptes_crees order by role, agence;
+
+-- Pour imposer aussi le changement aux comptes DÉJÀ créés (sauf l'administrateur), lancer une fois :
+--   insert into mdp_reinitialisations(user_id, hash)
+--   select u.id, u.encrypted_password from auth.users u join profiles p on p.id = u.id where p.role <> 'ADMIN'
+--   on conflict (user_id) do update set hash = excluded.hash, reinitialise_le = now();
+--   update profiles set doit_changer_mdp = true where role <> 'ADMIN';

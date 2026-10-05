@@ -17,6 +17,9 @@ import Comptes from './pages/Comptes'
 import Cloture from './pages/Cloture'
 import Fournisseurs from './pages/Fournisseurs'
 import FournisseurDetail from './pages/FournisseurDetail'
+import Compte from './pages/Compte'
+import Utilisateurs from './pages/Utilisateurs'
+import ChangerMdpObligatoire from './components/ChangerMdpObligatoire'
 
 const qc = new QueryClient({ defaultOptions: { queries: { staleTime: 10_000, retry: 1 } } })
 
@@ -33,6 +36,7 @@ function Gate() {
       </div>
     </div>
   )
+  if (profile.doit_changer_mdp) return <ChangerMdpObligatoire />
   return (
     <CycleProvider>
       <Routes>
@@ -46,6 +50,8 @@ function Gate() {
           <Route path="depenses" element={<Depenses />} />
           <Route path="comptes" element={<Comptes />} />
           <Route path="cloture" element={<Cloture />} />
+          <Route path="compte" element={<Compte />} />
+          <Route path="utilisateurs" element={<Utilisateurs />} />
           <Route path="fournisseurs" element={<Fournisseurs />} />
           <Route path="fournisseurs/:id" element={<FournisseurDetail />} />
           <Route path="reaffectations" element={<Reaffectations />} />
