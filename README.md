@@ -19,7 +19,8 @@ Les autres comptes se créent ensuite avec leur rôle (CHEF, RM, DML, CG, DG, TR
 `supabase/tests/test_regles.sql` joue 45 scénarios (un par rôle) sur un Postgres vide avec un schéma `auth` factice.
 `supabase/tests/test_cloture.sql` (à jouer après) couvre compte d'emploi, contrôle et clôture.
 `supabase/tests/test_import.sql` couvre l'import Excel.
-Dernier résultat : 82 scénarios réussis (45 + 28 + 9), 0 échec.
+`supabase/tests/test_besoins.sql` couvre les fiches de besoin.
+Dernier résultat : 99 scénarios réussis (45 + 28 + 9 + 17), 0 échec.
 
 ## Règles à valider (voir l'analyse du cahier des charges)
 - `seuil_reaf_dg` (2 000 000 FCFA) est **provisoire** : le cahier des charges ne le chiffre pas.
@@ -31,7 +32,7 @@ npm install
 npm run dev      # http://localhost:5173 (lit .env.local)
 npm run build
 ```
-Écrans : tableau de bord, besoins (saisie et soumission), arbitrage DML, décisions figées et signatures,
+Écrans : tableau de bord, besoins (on crée ou on choisit d'abord un besoin, puis on y ajoute ses lignes), arbitrage DML, décisions figées et signatures,
 MAD (génération, virement, accusé), dépenses, réaffectations. Menus et boutons dépendent du rôle ;
 les vrais contrôles restent dans la base (RLS et triggers).
 

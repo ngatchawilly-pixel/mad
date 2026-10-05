@@ -7,6 +7,7 @@ import Layout from './components/Layout'
 import Login from './pages/Login'
 import Dashboard from './pages/Dashboard'
 import Besoins from './pages/Besoins'
+import BesoinDetail from './pages/BesoinDetail'
 import Arbitrage from './pages/Arbitrage'
 import Decisions from './pages/Decisions'
 import Mad from './pages/Mad'
@@ -36,6 +37,7 @@ function Gate() {
         <Route element={<Layout />}>
           <Route index element={<Dashboard />} />
           <Route path="besoins" element={<Besoins />} />
+          <Route path="besoins/:id" element={<BesoinDetail />} />
           <Route path="arbitrage" element={<Arbitrage />} />
           <Route path="decisions" element={<Decisions />} />
           <Route path="mad" element={<Mad />} />
