@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { NavLink, Outlet } from 'react-router-dom'
-import { LayoutDashboard, ClipboardList, Scale, FileSignature, Banknote, Receipt, ArrowLeftRight, ShieldCheck, Lock, LogOut, Menu, X } from 'lucide-react'
+import { LayoutDashboard, ClipboardList, Scale, FileSignature, Banknote, Receipt, ArrowLeftRight, ShieldCheck, Lock, Truck, LogOut, Menu, X } from 'lucide-react'
 import { useAuth } from '../auth'
 import { useCycle, useRealtime } from '../lib/data'
 import { ROLE_LABEL, type Role } from '../lib/supabase'
@@ -14,6 +14,7 @@ const NAV: { to: string; label: string; icon: typeof Menu; roles: Role[] }[] = [
   { to: '/depenses', label: 'Dépenses', icon: Receipt, roles: ['CHEF', 'RM', 'CG', 'DML', 'ADMIN'] },
   { to: '/comptes', label: "Comptes d'emploi", icon: ShieldCheck, roles: ['CHEF', 'RM', 'DML', 'CG', 'DG', 'ADMIN'] },
   { to: '/cloture', label: 'Clôture', icon: Lock, roles: ['DML', 'CG', 'DG', 'ADMIN'] },
+  { to: '/fournisseurs', label: 'Fournisseurs', icon: Truck, roles: ['CHEF', 'RM', 'DML', 'CG', 'DG', 'TRES', 'ADMIN'] },
   { to: '/reaffectations', label: 'Réaffectations', icon: ArrowLeftRight, roles: ['CHEF', 'RM', 'DML', 'DG', 'ADMIN'] }
 ]
 

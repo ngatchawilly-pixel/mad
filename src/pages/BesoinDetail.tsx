@@ -141,6 +141,9 @@ function LigneForm({ besoin, onClose, onSaved }: { besoin: Row; onClose: () => v
   const parc = useRows(['parc', besoin.agence_code], () => supabase.from('parc').select('*').eq('agence_code', besoin.agence_code).order('code'))
   const fournisseurs = useRows(['fournisseurs'], () => supabase.from('fournisseurs').select('*').order('raison_sociale'))
   const grille = useRows(['grille'], () => supabase.from('grille_prix').select('*'))
+  const catalogue = useRows(['catalogue-fournisseur', f.fournisseur_id], () =>
+    supabase.from('articles_fournisseur').select('id, reference, designation, prix_unitaire').eq('fournisseur_id', f.fournisseur_id).eq('actif', true).order('reference'),
+    !!f.fournisseur_id)
 
   const vehicule = parc.data?.find(p => p.code === f.code_parc)
   const montant = (Number(f.quantite) || 0) * (Number(f.prix_unitaire) || 0)
@@ -213,6 +216,19 @@ function LigneForm({ besoin, onClose, onSaved }: { besoin: Row; onClose: () => v
             {fournisseurs.data?.map(x => <option key={x.id} value={x.id}>{x.raison_sociale}</option>)}
           </select>
         </Field>
+        {(catalogue.data ?? []).length > 0 && (
+          <div className="sm:col-span-2">
+            <Field label="Article du catalogue de ce fournisseur" hint="Remplit la référence, la désignation et le prix.">
+              <select className={inputCls} value="" onChange={e => {
+                const art = catalogue.data?.find(x => x.id === e.target.value)
+                if (art) setF(s => ({ ...s, reference: art.reference, designation: art.designation, prix_unitaire: art.prix_unitaire }))
+              }}>
+                <option value="">Choisir un article…</option>
+                {catalogue.data!.map(x => <option key={x.id} value={x.id}>{x.reference} — {x.designation} ({fcfa(x.prix_unitaire)})</option>)}
+              </select>
+            </Field>
+          </div>
+        )}
         <Field label="Référence du devis ou pro forma" hint="Obligatoire au-delà de 250 000 FCFA">
           <input className={inputCls} value={f.ref_devis ?? ''} onChange={e => set('ref_devis', e.target.value)} />
         </Field>

@@ -15,6 +15,8 @@ import Depenses from './pages/Depenses'
 import Reaffectations from './pages/Reaffectations'
 import Comptes from './pages/Comptes'
 import Cloture from './pages/Cloture'
+import Fournisseurs from './pages/Fournisseurs'
+import FournisseurDetail from './pages/FournisseurDetail'
 
 const qc = new QueryClient({ defaultOptions: { queries: { staleTime: 10_000, retry: 1 } } })
 
@@ -44,6 +46,8 @@ function Gate() {
           <Route path="depenses" element={<Depenses />} />
           <Route path="comptes" element={<Comptes />} />
           <Route path="cloture" element={<Cloture />} />
+          <Route path="fournisseurs" element={<Fournisseurs />} />
+          <Route path="fournisseurs/:id" element={<FournisseurDetail />} />
           <Route path="reaffectations" element={<Reaffectations />} />
           <Route path="*" element={<Navigate to="/" replace />} />
         </Route>
