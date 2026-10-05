@@ -26,7 +26,7 @@ export default function ImportBesoins({ cycle, onClose, onDone }: { cycle: strin
       // contexte : ce que la base connaît déjà (pour ne pas dupliquer)
       const [ag, parc, gr, ex] = await Promise.all([
         supabase.from('agences').select('code, nom'),
-        supabase.from('parc').select('code'),
+        supabase.from('parc').select('code, chassis'),
         supabase.from('grille_prix').select('reference'),
         supabase.from('lignes_besoin').select('agence_code, code_parc, designation, reference, quantite, prix_unitaire').eq('cycle_id', cycle)
       ])
@@ -34,7 +34,7 @@ export default function ImportBesoins({ cycle, onClose, onDone }: { cycle: strin
       if (erreurLecture) throw erreurLecture
       const c = {
         agences: (ag.data ?? []) as { code: string; nom: string }[],
-        parcExistant: new Set((parc.data ?? []).map((p: Row) => p.code as string)),
+        parcExistant: new Map((parc.data ?? []).map((p: Row) => [p.code as string, (p.chassis as string | null) ?? null] as [string, string | null])),
         grilleExistante: new Set((gr.data ?? []).map((g: Row) => String(g.reference).toLowerCase())),
         cleExistantes: new Set((ex.data ?? []).map((l: Row) =>
           [l.agence_code, l.code_parc ?? '', strip(l.designation), l.reference ?? '', Number(l.quantite), Number(l.prix_unitaire)].join('|')))
@@ -60,7 +60,7 @@ export default function ImportBesoins({ cycle, onClose, onDone }: { cycle: strin
     })
     setOccupe(false)
     if (error) return toast('err', erreur(error))
-    toast('ok', `${data.lignes} lignes importées en brouillon (${data.vehicules} véhicules, ${data.fournisseurs} fournisseurs créés)`)
+    toast('ok', `${data.lignes} lignes importées en brouillon (${data.vehicules} véhicules créés, ${data.fournisseurs} fournisseurs créés)`)
     onDone()
   }
 
@@ -85,7 +85,7 @@ export default function ImportBesoins({ cycle, onClose, onDone }: { cycle: strin
           <>
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-sm">
               <Mini label="Lignes à importer" valeur={String(r.importees)} sous={fcfa(r.montant)} />
-              <Mini label="Nouveaux véhicules" valeur={String(r.nouveauxVehicules)} sous="créés au parc" />
+              <Mini label="Nouveaux véhicules" valeur={String(r.nouveauxVehicules)} sous={r.chassisCompletes ? `+ ${r.chassisCompletes} châssis complétés` : 'créés au parc'} />
               <Mini label="Doublons ignorés" valeur={String(r.doublons)} />
               <Mini label="Fournisseurs unifiés" valeur={String(Object.keys(r.fournisseursUnifies).length)} sous={`${res.fournisseurs.length} distincts`} />
             </div>

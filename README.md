@@ -20,7 +20,8 @@ Les autres comptes se créent ensuite avec leur rôle (CHEF, RM, DML, CG, DG, TR
 `supabase/tests/test_cloture.sql` (à jouer après) couvre compte d'emploi, contrôle et clôture.
 `supabase/tests/test_import.sql` couvre l'import Excel.
 `supabase/tests/test_besoins.sql` couvre les fiches de besoin.
-Dernier résultat : 99 scénarios réussis (45 + 28 + 9 + 17), 0 échec.
+`supabase/tests/test_referentiels.sql` (après `seed_referentiels.sql`) couvre les référentiels.
+Dernier résultat : 111 scénarios réussis (45 + 28 + 9 + 17 + 12), 0 échec.
 
 ## Règles à valider (voir l'analyse du cahier des charges)
 - `seuil_reaf_dg` (2 000 000 FCFA) est **provisoire** : le cahier des charges ne le chiffre pas.
@@ -41,3 +42,8 @@ les vrais contrôles restent dans la base (RLS et triggers).
 Import Excel (DML) : bouton « Importer Excel » dans Besoins, aperçu puis écriture atomique en brouillon.
 
 Reste à faire : relances automatiques (pg_cron), Edge Functions et API d'interconnexion.
+
+## Référentiels (dossier 00_REFERENTIELS)
+`node scripts/generer_referentiels.mjs` lit `agences.xlsx`, `vehicules.xlsx` et `seuils.xlsx` et génère
+`supabase/seed_referentiels.sql` (à lancer après la migration 8, sans danger si relancé).
+Rapport affiché par le script : sites inconnus, codes écartés, quasi-doublons signalés dans `parc.remarque`.

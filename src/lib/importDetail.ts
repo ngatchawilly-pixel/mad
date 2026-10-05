@@ -119,7 +119,7 @@ const mediane = (a: number[]) => {
 // ---------- Préparation de l'import ----------
 export type Contexte = {
   agences: { code: string; nom: string }[]
-  parcExistant: Set<string>
+  parcExistant: Map<string, string | null>   // code -> châssis connu
   grilleExistante: Set<string>
   cleExistantes: Set<string>          // lignes déjà présentes dans le cycle (agence|code|désignation|réf|qté|pu)
 }
@@ -140,7 +140,7 @@ export type Resultat = {
   rapport: {
     lus: number; importees: number; montant: number
     parAgence: Record<string, number>; agencesInconnues: Record<string, number>
-    doublons: number; nouveauxVehicules: number; conflitsChassis: { code: string; chassis: string[] }[]
+    doublons: number; nouveauxVehicules: number; chassisCompletes: number; conflitsChassis: { code: string; chassis: string[] }[]
     fournisseursUnifies: Record<string, string>; sansFournisseur: number; plusieursFournisseurs: number
     prixManquants: number; ecartsTotal: number; typeInfere: number; sansCodeParc: number; remisesSansOT: number
   }
@@ -153,7 +153,7 @@ export function preparer(rows: RawRow[], ctx: Contexte, options: { grille: boole
   const res: Resultat = {
     lignes: [], vehicules: [], fournisseurs: [], grille: [],
     rapport: {
-      lus: rows.length, importees: 0, montant: 0, parAgence: {}, agencesInconnues: {}, doublons: 0, nouveauxVehicules: 0,
+      lus: rows.length, importees: 0, montant: 0, parAgence: {}, agencesInconnues: {}, doublons: 0, nouveauxVehicules: 0, chassisCompletes: 0,
       conflitsChassis: [], fournisseursUnifies: {}, sansFournisseur: 0, plusieursFournisseurs: 0, prixManquants: 0,
       ecartsTotal: 0, typeInfere: 0, sansCodeParc: 0, remisesSansOT: 0
     }
@@ -201,10 +201,18 @@ export function preparer(rows: RawRow[], ctx: Contexte, options: { grille: boole
 
     // véhicule du référentiel
     if (code) {
-      if (!ctx.parcExistant.has(code) && !vehiculesVus.has(code)) {
+      if (!vehiculesVus.has(code)) {
+        vehiculesVus.add(code)
         const chs = [...(chassisParCode[code] ?? [])]
-        res.vehicules.push({ code, agence_code: ag, famille: VEHICULES.includes(fam) ? fam : 'Camion', chassis: chs[0] ?? null, etat })
-        vehiculesVus.add(code); r.nouveauxVehicules++
+        const famille = VEHICULES.includes(fam) ? fam : 'Camion'
+        if (!ctx.parcExistant.has(code)) {
+          res.vehicules.push({ code, agence_code: ag, famille, chassis: chs[0] ?? null, etat })
+          r.nouveauxVehicules++
+        } else if (!ctx.parcExistant.get(code) && chs[0]) {
+          // véhicule déjà au parc mais sans châssis : on le complète (la base ne remplace jamais un châssis existant)
+          res.vehicules.push({ code, agence_code: ag, famille, chassis: chs[0], etat })
+          r.chassisCompletes++
+        }
         if (chs.length > 1) r.conflitsChassis.push({ code, chassis: chs })
       }
     } else r.sansCodeParc++
