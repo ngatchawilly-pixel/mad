@@ -1,0 +1,6 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+body { @apply bg-slate-50 text-slate-800 antialiased; }
+.num { font-variant-numeric: tabular-nums; }
