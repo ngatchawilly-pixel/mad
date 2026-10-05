@@ -1,9 +1,9 @@
 import { useMemo, useState, type FormEvent } from 'react'
 import { Link, useParams } from 'react-router-dom'
-import { ArrowLeft, Plus, Send, Trash2 } from 'lucide-react'
+import { ArrowLeft, Calculator, Plus, RotateCcw, Send, Trash2, Undo2 } from 'lucide-react'
 import { useAuth } from '../auth'
-import { supabase, erreur, STATUT_LABEL, type Row } from '../lib/supabase'
-import { useRefresh, useRows } from '../lib/data'
+import { supabase, erreur, STATUT_LABEL, MOTIFS_NON_VALIDATION, type Row } from '../lib/supabase'
+import { useCycle, useRefresh, useRows } from '../lib/data'
 import { date, fcfa } from '../lib/format'
 import { Badge, Button, Card, Empty, Field, Modal, Table, inputCls, statutTone, useAction, useToast } from '../components/ui'
 import { BESOIN_STATUT } from './Besoins'
@@ -13,12 +13,11 @@ const TYPES = ['Remise en service', 'Entretien préventif', 'Mise à niveau', 'S
 export default function BesoinDetail() {
   const { id } = useParams()
   const { profile } = useAuth()
+  const { cycles } = useCycle()
   const refresh = useRefresh()
   const agir = useAction()
-  const toast = useToast()
   const [ajout, setAjout] = useState(false)
   const role = profile!.role
-  const peutSaisir = ['CHEF', 'RM', 'DML'].includes(role)
 
   const fiche = useRows(['besoin', id], () => supabase.from('v_besoins').select('*').eq('id', id!), !!id)
   const lignes = useRows(['besoin-lignes', id], () =>
@@ -36,19 +35,15 @@ export default function BesoinDetail() {
   const [libStatut, ton] = BESOIN_STATUT[b.statut] ?? [b.statut, 'gris']
   const toutes = lignes.data ?? []
   const brouillons = toutes.filter(l => l.statut === 'BROUILLON')
+  const enAttente = toutes.filter(l => ['EXPRIMEE', 'REEXPRIMEE'].includes(l.statut))
+  const enSaisie = ['VIDE', 'EN_SAISIE'].includes(b.statut)
+  const soumis = b.statut === 'SOUMIS'
+  const decide = !enSaisie && !soumis
+  const cycleOuvert = cycles.find(c => c.id === b.cycle_id)?.statut === 'OUVERT'
 
-  async function soumettreTout() {
-    let ok = 0
-    const erreurs: string[] = []
-    for (const l of brouillons) {
-      const { error } = await supabase.from('lignes_besoin').update({ statut: 'EXPRIMEE' }).eq('id_besoin', l.id_besoin)
-      if (error) erreurs.push(`${l.id_besoin} : ${erreur(error)}`)
-      else ok++
-    }
-    if (ok) toast('ok', `${ok} ligne(s) soumise(s)`)
-    if (erreurs.length) toast('err', erreurs.slice(0, 3).join(' — ') + (erreurs.length > 3 ? ` (+${erreurs.length - 3} autres)` : ''))
-    refresh()
-  }
+  const estChef = role === 'CHEF'
+  const peutSaisir = ['CHEF', 'RM', 'DML'].includes(role) && enSaisie
+  const reexprimables = toutes.filter(l => l.statut === 'NON_VALIDEE' && !['REPORTE', 'SACRIFIE'].includes(l.motif_code ?? ''))
 
   return (
     <div className="space-y-4">
@@ -62,26 +57,56 @@ export default function BesoinDetail() {
             Agence {b.agence_code} · cycle {b.cycle_id}{b.service ? ` · ${b.service}` : ''} · créé le {date(b.created_at)}
           </p>
         </div>
-        <div className="flex flex-wrap items-center gap-2">
+        <div className="flex flex-wrap items-center justify-end gap-2">
           <Badge tone={ton}>{libStatut}</Badge>
-          {peutSaisir && brouillons.length > 0 && (
-            <Button variant="secondary" onClick={soumettreTout}><Send size={14} /> Soumettre {brouillons.length} ligne(s)</Button>
+          {peutSaisir && <Button variant="secondary" onClick={() => setAjout(true)}><Plus size={16} /> Ajouter une ligne</Button>}
+          {estChef && enSaisie && brouillons.length > 0 && (
+            <Button onClick={() => {
+              if (window.confirm(`Soumettre le besoin ${b.numero} avec ses ${brouillons.length} ligne(s) à la DML ? Vous ne pourrez plus le modifier (sauf à le rappeler avant la décision).`))
+                agir(() => supabase.rpc('soumettre_besoin', { p_besoin: b.id }), 'Besoin soumis à la DML', refresh)
+            }}><Send size={16} /> Soumettre le besoin</Button>
           )}
-          {peutSaisir && <Button onClick={() => setAjout(true)}><Plus size={16} /> Ajouter une ligne</Button>}
+          {estChef && soumis && enAttente.length === toutes.filter(l => l.statut !== 'ABANDONNEE').length && (
+            <Button variant="secondary" onClick={() => agir(() => supabase.rpc('rappeler_besoin', { p_besoin: b.id }), 'Besoin rappelé : vous pouvez le modifier', refresh)}>
+              <Undo2 size={16} /> Rappeler le besoin
+            </Button>
+          )}
+          {estChef && decide && cycleOuvert && reexprimables.length > 0 && (
+            <Button variant="secondary" onClick={() => agir(() => supabase.rpc('reexprimer_besoin', { p_besoin: b.id }),
+              `${reexprimables.length} ligne(s) réexprimée(s), besoin soumis à nouveau`, refresh)}>
+              <RotateCcw size={16} /> Réexprimer les lignes non retenues ({reexprimables.length})
+            </Button>
+          )}
         </div>
       </div>
 
-      <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+      {enSaisie && (role === 'CHEF' || role === 'RM') && (
+        <div className="rounded-xl border border-brand-100 bg-brand-50 px-4 py-3 text-sm text-brand-900">
+          {role === 'CHEF'
+            ? 'Ce besoin est en cours de saisie. Quand toutes ses lignes sont prêtes, soumettez le besoin : la DML le recevra en entier.'
+            : "Ce besoin est en cours de saisie. Quand toutes les lignes sont prêtes, le chef d'agence soumet le besoin à la DML."}
+        </div>
+      )}
+      {soumis && (role === 'CHEF' || role === 'RM') && (
+        <div className="rounded-xl border border-sky-200 bg-sky-50 px-4 py-3 text-sm text-sky-900">Ce besoin est soumis : il est en attente de la décision de la DML.</div>
+      )}
+
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
         <Mini label="Lignes" valeur={String(b.nb_lignes)} />
-        <Mini label="Montant" valeur={fcfa(b.montant)} />
+        <Mini label="Montant demandé" valeur={fcfa(b.montant)} />
         <Mini label="Brouillons" valeur={String(b.nb_brouillons)} />
+        <Mini label="En attente de décision" valeur={String(enAttente.length)} />
       </div>
+
+      {role === 'DML' && soumis && enAttente.length > 0 && (
+        <DecisionDML besoin={b} lignes={enAttente} onDone={refresh} />
+      )}
 
       <Card title="Lignes de ce besoin">
         {toutes.length === 0 ? (
           <Empty>Ce besoin n'a pas encore de ligne. Utilisez « Ajouter une ligne ».</Empty>
         ) : (
-          <Table head={['Identifiant', 'Véhicule', 'Désignation', 'Montant', 'Priorité', 'Score', 'Statut', '']}>
+          <Table head={['Identifiant', 'Véhicule', 'Désignation', 'Demandé', 'Priorité', 'Score', 'Statut', 'Décision', '']}>
             {toutes.map(l => (
               <tr key={l.id_besoin} className="align-top">
                 <td className="px-3 py-2 font-mono text-xs">{l.id_besoin}{l.rang > 1 && <span className="ml-1 text-slate-400">r{l.rang}</span>}</td>
@@ -94,21 +119,17 @@ export default function BesoinDetail() {
                 <td className="px-3 py-2">{l.priorite}</td>
                 <td className="px-3 py-2 num">{l.score ?? '–'}</td>
                 <td className="px-3 py-2"><Badge tone={statutTone(l.statut)}>{STATUT_LABEL[l.statut]}</Badge></td>
-                <td className="px-3 py-2 text-right whitespace-nowrap space-x-1">
-                  {l.statut === 'BROUILLON' && peutSaisir && (<>
-                    <Button variant="secondary" onClick={() => agir(
-                      () => supabase.from('lignes_besoin').update({ statut: 'EXPRIMEE' }).eq('id_besoin', l.id_besoin),
-                      `${l.id_besoin} soumise`, refresh)}><Send size={14} /> Soumettre</Button>
+                <td className="px-3 py-2 text-xs text-slate-600">
+                  {l.montant_retenu != null && <div><Badge tone="vert">{l.mode}</Badge> <span className="num">{fcfa(l.montant_retenu)}</span></div>}
+                  {l.statut === 'NON_VALIDEE' && l.motif_code && <div>{MOTIFS_NON_VALIDATION.find(m => m[0] === l.motif_code)?.[1] ?? l.motif_code}</div>}
+                </td>
+                <td className="px-3 py-2 text-right whitespace-nowrap">
+                  {l.statut === 'BROUILLON' && peutSaisir && (
                     <Button variant="ghost" aria-label={`Retirer ${l.id_besoin}`} onClick={() => {
                       if (window.confirm(`Retirer la ligne ${l.id_besoin} ? Elle reste tracée mais ne compte plus.`))
                         agir(() => supabase.from('lignes_besoin').update({ statut: 'ABANDONNEE', motif_code: 'SAISIE_ERRONEE' }).eq('id_besoin', l.id_besoin),
                           `${l.id_besoin} retirée`, refresh)
                     }}><Trash2 size={14} /></Button>
-                  </>)}
-                  {l.statut === 'NON_VALIDEE' && peutSaisir && (
-                    <Button variant="secondary" onClick={() => agir(
-                      () => supabase.from('lignes_besoin').update({ statut: 'REEXPRIMEE' }).eq('id_besoin', l.id_besoin),
-                      `${l.id_besoin} réexprimée`, refresh)}>Réexprimer</Button>
                   )}
                 </td>
               </tr>
@@ -119,6 +140,104 @@ export default function BesoinDetail() {
 
       {ajout && <LigneForm besoin={b} onClose={() => setAjout(false)} onSaved={refresh} />}
     </div>
+  )
+}
+
+type Choix = { retenue: boolean; mode: 'MDD' | 'MDI'; montant: string; motif: string }
+
+// La DML sélectionne les lignes à retenir, précise mode et montant, motive les autres, puis valide le besoin.
+function DecisionDML({ besoin, lignes, onDone }: { besoin: Row; lignes: Row[]; onDone: () => void }) {
+  const agir = useAction()
+  const [choix, setChoix] = useState<Record<string, Choix>>(() =>
+    Object.fromEntries(lignes.map(l => [l.id_besoin, { retenue: false, mode: l.montant > 2_000_000 ? 'MDI' : 'MDD', montant: String(l.montant), motif: '' } as Choix])))
+  const [motifCommun, setMotifCommun] = useState('')
+  const maj = (id: string, p: Partial<Choix>) => setChoix(c => ({ ...c, [id]: { ...c[id], ...p } }))
+
+  const retenues = lignes.filter(l => choix[l.id_besoin]?.retenue)
+  const ecartees = lignes.filter(l => !choix[l.id_besoin]?.retenue)
+  const totalRetenu = retenues.reduce((s, l) => s + (Number(choix[l.id_besoin].montant) || 0), 0)
+
+  // problèmes qui empêchent de valider
+  const problemes: string[] = []
+  retenues.forEach(l => {
+    const c = choix[l.id_besoin], m = Number(c.montant)
+    if (!(m > 0)) problemes.push(`${l.id_besoin} : montant retenu à saisir`)
+    else if (m > l.montant) problemes.push(`${l.id_besoin} : le montant retenu dépasse le demandé`)
+  })
+  ecartees.forEach(l => { if (!(choix[l.id_besoin].motif || motifCommun)) problemes.push(`${l.id_besoin} : motif de non-retenue à choisir`) })
+
+  const calculer = () => agir(() => supabase.rpc('calculer_scores', { p_cycle: besoin.cycle_id }), 'Scores calculés', onDone)
+  const valider = () => {
+    const decisions = lignes.map(l => {
+      const c = choix[l.id_besoin]
+      return c.retenue
+        ? { id_besoin: l.id_besoin, decision: 'VALIDEE', mode: c.mode, montant_retenu: Number(c.montant) }
+        : { id_besoin: l.id_besoin, decision: 'NON_VALIDEE', motif_code: c.motif || motifCommun }
+    })
+    if (window.confirm(`Valider le besoin ${besoin.numero} : ${retenues.length} ligne(s) retenue(s) pour ${fcfa(totalRetenu)}, ${ecartees.length} non retenue(s) ?`))
+      agir(() => supabase.rpc('decider_besoin', { p_besoin: besoin.id, p_decisions: decisions }), `Besoin ${besoin.numero} validé`, onDone)
+  }
+
+  return (
+    <Card title="Décision de la DML : sélectionnez les lignes à retenir"
+      actions={<Button variant="secondary" onClick={calculer}><Calculator size={14} /> Calculer les scores</Button>}>
+      <div className="flex flex-wrap items-center gap-2 mb-3 text-sm">
+        <Button variant="secondary" onClick={() => setChoix(c => Object.fromEntries(Object.entries(c).map(([k, v]) => [k, { ...v, retenue: true }])))}>Tout retenir</Button>
+        <Button variant="secondary" onClick={() => setChoix(c => Object.fromEntries(Object.entries(c).map(([k, v]) => [k, { ...v, retenue: false }])))}>Tout écarter</Button>
+        <label className="flex items-center gap-2 ml-auto">
+          <span className="text-slate-600">Motif des lignes non retenues</span>
+          <select className={inputCls + ' !w-56'} value={motifCommun} onChange={e => setMotifCommun(e.target.value)}>
+            <option value="">À choisir…</option>
+            {MOTIFS_NON_VALIDATION.map(([k, v]) => <option key={k} value={k}>{v}</option>)}
+          </select>
+        </label>
+      </div>
+
+      <Table head={['Retenir', 'Ligne', 'Désignation', 'Demandé', 'Score', 'Mode', 'Montant retenu', 'Motif si non retenue']}>
+        {lignes.map(l => {
+          const c = choix[l.id_besoin]
+          return (
+            <tr key={l.id_besoin} className={`align-top ${c.retenue ? 'bg-brand-50/50' : ''}`}>
+              <td className="px-3 py-2">
+                <input type="checkbox" className="h-5 w-5 accent-[#039855]" checked={c.retenue} onChange={e => maj(l.id_besoin, { retenue: e.target.checked })}
+                  aria-label={`Retenir ${l.id_besoin}`} />
+              </td>
+              <td className="px-3 py-2 font-mono text-xs">{l.id_besoin}<div className="font-sans text-slate-500">{l.code_parc} · {l.priorite}</div></td>
+              <td className="px-3 py-2 max-w-[240px]">{l.designation}
+                {l.ecart_prix > 0.15 && <div className="mt-1"><Badge tone="orange">Prix +{Math.round(l.ecart_prix * 100)} % / grille</Badge></div>}</td>
+              <td className="px-3 py-2 num whitespace-nowrap">{fcfa(l.montant)}</td>
+              <td className="px-3 py-2 num font-semibold">{l.score ?? '–'}</td>
+              <td className="px-3 py-2">
+                <select disabled={!c.retenue} className={inputCls + ' !w-24'} value={c.mode} onChange={e => maj(l.id_besoin, { mode: e.target.value as 'MDD' | 'MDI' })} aria-label="Mode">
+                  <option>MDD</option><option>MDI</option>
+                </select>
+                {c.retenue && c.mode === 'MDD' && Number(c.montant) > 2_000_000 && <div className="mt-1 text-xs text-amber-700">MDI conseillé &gt; 2 M</div>}
+              </td>
+              <td className="px-3 py-2">
+                <input disabled={!c.retenue} type="number" min="0" className={inputCls + ' !w-32 num'} value={c.montant}
+                  onChange={e => maj(l.id_besoin, { montant: e.target.value })} aria-label="Montant retenu" />
+              </td>
+              <td className="px-3 py-2">
+                <select disabled={c.retenue} className={inputCls + ' !w-52'} value={c.motif} onChange={e => maj(l.id_besoin, { motif: e.target.value })} aria-label="Motif">
+                  <option value="">{motifCommun ? 'Motif commun' : 'À choisir…'}</option>
+                  {MOTIFS_NON_VALIDATION.map(([k, v]) => <option key={k} value={k}>{v}</option>)}
+                </select>
+              </td>
+            </tr>
+          )
+        })}
+      </Table>
+
+      <div className="mt-4 flex flex-wrap items-center justify-between gap-3 border-t border-slate-100 pt-4">
+        <div className="text-sm">
+          <p><strong>{retenues.length}</strong> retenue(s) pour <strong className="num">{fcfa(totalRetenu)}</strong> · <strong>{ecartees.length}</strong> non retenue(s)</p>
+          {problemes.length > 0 && (
+            <p className="text-amber-800 mt-1">À compléter : {problemes.slice(0, 2).join(' ; ')}{problemes.length > 2 ? ` (+${problemes.length - 2})` : ''}</p>
+          )}
+        </div>
+        <Button onClick={valider} disabled={problemes.length > 0}>Valider le besoin</Button>
+      </div>
+    </Card>
   )
 }
 

@@ -39,5 +39,8 @@ select t('ligne reportée : rattachée à une fiche du nouveau cycle', 3, $o$do 
                   where l.cycle_id='2611' and l.rang=2 and b.cycle_id='2611' and b.libelle like 'Besoins reportés du cycle 2610')
   then raise exception 'ligne reportée non rattachée'; end if; end $x$$o$, false);
 
+select t('fiche de report créée par l''ouverture du cycle : déjà soumise', 3, $o$do $x$ begin
+  if not exists (select 1 from besoins where libelle like 'Besoins reportés du cycle 2610' and statut = 'SOUMIS') then raise exception 'fiche de report non soumise'; end if; end $x$$o$, false);
+
 select n, case when ok then 'PASS' else 'FAIL' end as r, label, case when ok then '' else detail end as detail from res where not ok order by n;
 select count(*) filter (where ok) as pass, count(*) filter (where not ok) as fail from res;

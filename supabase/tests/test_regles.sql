@@ -39,20 +39,24 @@ select t('chef autre agence ne peut pas écrire sur BAF', 7, $$insert into besoi
 select t('ligne brouillon (id auto)', 1, $$insert into lignes_besoin(besoin_id,agence_code,cycle_id,code_parc,etat_vehicule,type_intervention,ot_panne,reference,designation,quantite,prix_unitaire,priorite,justification)
   values ('aaaaaaaa-0000-0000-0000-000000000001','BAF','2610','BAF-B01','Immobilisé','Remise en service','PA00000001','REF-1','Plaquettes',2,100000,'P1','Benne immobilisée')$$, false);
 select t('R1 : id au format AGENCE-AAMM-NNNN', 1, $o$do $x$ begin if not exists (select 1 from lignes_besoin where id_besoin='BAF-2610-0001') then raise exception 'id absent'; end if; end $x$$o$, false);
-select t('soumission incomplète refusée (sans justification)', 1, $$update lignes_besoin set justification='', statut='EXPRIMEE' where id_besoin='BAF-2610-0001'$$, true);
-select t('R6 : > 250 000 sans devis refusé', 1, $$update lignes_besoin set justification='Benne immobilisée', quantite=3, statut='EXPRIMEE' where id_besoin='BAF-2610-0001'$$, true);
-select t('prix > 15% grille sans explication refusé', 1, $$update lignes_besoin set quantite=2, prix_unitaire=130000, ref_devis='PF-1', statut='EXPRIMEE' where id_besoin='BAF-2610-0001'$$, true);
-select t('soumission valide', 1, $$update lignes_besoin set prix_unitaire=130000, justification_prix='Pièce importée', ref_devis='PF-1', statut='EXPRIMEE' where id_besoin='BAF-2610-0001'$$, false);
-select t('doublon véhicule+référence refusé', 2, $$insert into lignes_besoin(besoin_id,agence_code,cycle_id,code_parc,etat_vehicule,type_intervention,ot_panne,reference,designation,quantite,prix_unitaire,priorite,justification,ref_devis,justification_prix,statut)
-  values ('aaaaaaaa-0000-0000-0000-000000000001','BAF','2610','BAF-B01','Immobilisé','Remise en service','PA00000001','REF-1','Doublon',1,130000,'P1','x','PF','x','EXPRIMEE')$$, true);
+select t('soumission du besoin refusée : ligne sans justification', 1, $o$do $x$ begin update lignes_besoin set justification='' where id_besoin='BAF-2610-0001'; perform soumettre_besoin('aaaaaaaa-0000-0000-0000-000000000001'); end $x$$o$, true);
+select t('R6 : > 250 000 sans devis refusé', 1, $o$do $x$ begin update lignes_besoin set quantite=3 where id_besoin='BAF-2610-0001'; perform soumettre_besoin('aaaaaaaa-0000-0000-0000-000000000001'); end $x$$o$, true);
+select t('prix > 15% grille sans explication refusé', 1, $o$do $x$ begin update lignes_besoin set prix_unitaire=130000, ref_devis='PF-1' where id_besoin='BAF-2610-0001'; perform soumettre_besoin('aaaaaaaa-0000-0000-0000-000000000001'); end $x$$o$, true);
+select t('soumission du besoin valide', 1, $o$do $x$ begin update lignes_besoin set prix_unitaire=130000, justification_prix='Pièce importée', ref_devis='PF-1' where id_besoin='BAF-2610-0001'; perform soumettre_besoin('aaaaaaaa-0000-0000-0000-000000000001'); end $x$$o$, false);
+select t('doublon véhicule+référence refusé à la soumission', 1, $o$do $x$ declare b uuid; begin
+  insert into besoins(agence_code, cycle_id, libelle) values ('BAF','2610','Besoin doublon') returning id into b;
+  insert into lignes_besoin(besoin_id,agence_code,cycle_id,code_parc,etat_vehicule,type_intervention,ot_panne,reference,designation,quantite,prix_unitaire,priorite,justification,ref_devis,justification_prix)
+   values (b,'BAF','2610','BAF-B01','Immobilisé','Remise en service','PA00000001','REF-1','Doublon',1,130000,'P1','x','PF','x');
+  perform soumettre_besoin(b);
+end $x$$o$, true);
 
 -- arbitrage
 select t('chef ne peut pas valider sa ligne', 1, $$update lignes_besoin set statut='VALIDEE', mode='MDD', montant_retenu=260000 where id_besoin='BAF-2610-0001'$$, true);
 select t('DML calcule les scores', 3, $$select calculer_scores('2610')$$, false);
 select t('score attendu 85 (30+20+20+0+10+5)', 3, $o$do $x$ begin if (select score from lignes_besoin where id_besoin='BAF-2610-0001') <> 85 then raise exception 'score=%',(select score from lignes_besoin where id_besoin='BAF-2610-0001'); end if; end $x$$o$, false);
-select t('validation sans mode/montant refusée', 3, $$update lignes_besoin set statut='VALIDEE' where id_besoin='BAF-2610-0001'$$, true);
-select t('non-validation sans motif refusée', 3, $$update lignes_besoin set statut='NON_VALIDEE' where id_besoin='BAF-2610-0001'$$, true);
-select t('DML valide (MDD, 260 000)', 3, $$update lignes_besoin set statut='VALIDEE', mode='MDD', montant_retenu=260000 where id_besoin='BAF-2610-0001'$$, false);
+select t('validation sans mode/montant refusée', 3, $o$select decider_besoin('aaaaaaaa-0000-0000-0000-000000000001','[{"id_besoin":"BAF-2610-0001","decision":"VALIDEE"}]')$o$, true);
+select t('non-validation sans motif refusée', 3, $o$select decider_besoin('aaaaaaaa-0000-0000-0000-000000000001','[{"id_besoin":"BAF-2610-0001","decision":"NON_VALIDEE"}]')$o$, true);
+select t('DML valide le besoin (ligne retenue en MDD, 260 000)', 3, $o$select decider_besoin('aaaaaaaa-0000-0000-0000-000000000001','[{"id_besoin":"BAF-2610-0001","decision":"VALIDEE","mode":"MDD","montant_retenu":260000}]')$o$, false);
 
 -- décision
 select t('MAD refusée sans décision verrouillée (R4/R5)', 3, $$select generer_mad('BAF','2610','MDD')$$, true);

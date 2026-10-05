@@ -15,7 +15,7 @@ for t in regles cloture import besoins; do
   echo "test_$t : $r"; set -- $r; total=$((total+$1)); echec=$((echec+$2))
 done
 run < supabase/seed_referentiels.sql
-for t in referentiels catalogue comptes; do
+for t in referentiels catalogue comptes workflow; do
   out=$(docker exec -i $C psql -U postgres -q -A -F ' | ' < supabase/tests/test_$t.sql 2>&1)
   r=$(echo "$out" | grep -A1 '^pass' | tail -1 | tr -d '|'); echo "test_$t : $r"; set -- $r; total=$((total+$1)); echec=$((echec+$2))
   echo "$out" | grep -E '^[0-9]+ \| FAIL' 

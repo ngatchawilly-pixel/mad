@@ -27,7 +27,7 @@ select t('une ligne invalide annule tout l''import (atomique)', 3, $o$select imp
     {"ligne_excel":3,"agence_code":"KRI","code_parc":"INCONNU","etat_vehicule":"Immobilisé","designation":"Mauvais","quantite":1,"prix_unitaire":1,"priorite":"P1"}]')$o$, true);
 select t('rien n''a été écrit après l''échec', 3, $o$do $x$ begin
   if (select count(*) from lignes_besoin where cycle_id='2611' and designation in ('Bon','Mauvais')) <> 0 then raise exception 'import partiel'; end if; end $x$$o$, false);
-select t('soumission d''une ligne importée sans justification refusée (règles actives)', 7, $o$update lignes_besoin set statut='EXPRIMEE' where id_besoin='KRI-2611-0001'$o$, true);
+select t('soumission du besoin importé sans justification refusée (règles actives)', 7, $o$select soumettre_besoin(id) from besoins where agence_code='KRI' and cycle_id='2611' order by created_at limit 1$o$, true);
 
 select n, case when ok then 'PASS' else 'FAIL' end as r, label, case when ok then '' else detail end as detail from res where not ok order by n;
 select count(*) filter (where ok) as pass, count(*) filter (where not ok) as fail from res;
