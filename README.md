@@ -24,7 +24,7 @@ Les autres comptes se créent ensuite avec leur rôle (CHEF, RM, DML, CG, DG, TR
 `supabase/tests/test_catalogue.sql` couvre le catalogue fournisseurs.
 `supabase/tests/test_comptes.sql` couvre les mots de passe. Toute la suite : `bash supabase/tests/lancer_tests.sh` (Docker).
 `supabase/tests/test_workflow.sql` couvre le circuit au niveau du besoin.
-Dernier résultat : 217 scénarios réussis (45 + 28 + 9 + 18 + 12 + 23 + 31 + 51), 0 échec.
+Dernier résultat : 226 scénarios réussis (45 + 28 + 9 + 18 + 12 + 23 + 31 + 60), 0 échec.
 
 ## Règles à valider (voir l'analyse du cahier des charges)
 - `seuil_reaf_dg` (2 000 000 FCFA) est **provisoire** : le cahier des charges ne le chiffre pas.

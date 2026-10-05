@@ -63,6 +63,22 @@ select t('le chef rappelle son besoin', 1, $o$select rappeler_besoin(wf_besoin()
 select t('besoin de nouveau en saisie, lignes en brouillon', null, $o$do $x$ begin
   if (select count(*) from lignes_besoin where besoin_id = wf_besoin() and statut = 'BROUILLON') <> 3 then raise exception 'lignes'; end if;
   if (select statut from v_besoins where id = wf_besoin()) <> 'EN_SAISIE' then raise exception 'statut'; end if; end $x$$o$, false);
+-- ---------- Modification des lignes tant que le besoin n'est pas soumis ----------
+select t('le chef modifie une ligne en brouillon (désignation, quantité, prix, fournisseur de référence)', 1, $o$do $x$ begin
+  update lignes_besoin set designation = 'Alternateur 24V', quantite = 2, prix_unitaire = 105000, reference = 'REF-B2' where id_besoin = 'BAF-2612-0002';
+  if (select designation || '/' || quantite || '/' || prix_unitaire || '/' || reference from lignes_besoin where id_besoin = 'BAF-2612-0002') <> 'Alternateur 24V/2/105000/REF-B2'
+  then raise exception 'modification non enregistrée'; end if;
+  -- on remet les valeurs d''origine pour la suite du scénario
+  update lignes_besoin set designation = 'Alternateur', quantite = 1, prix_unitaire = 200000, reference = 'REF-B' where id_besoin = 'BAF-2612-0002';
+end $x$$o$, false);
+select t('le responsable maintenance modifie aussi un brouillon (véhicule, priorité)', 2, $o$update lignes_besoin set code_parc = 'BAF-B02', priorite = 'P2' where id_besoin = 'BAF-2612-0001'$o$, false);
+select t('... et remet le véhicule d''origine', 2, $o$update lignes_besoin set code_parc = 'BAF-B01', priorite = 'P1' where id_besoin = 'BAF-2612-0001'$o$, false);
+select t('l''identifiant d''une ligne ne se modifie pas', 1, $o$update lignes_besoin set id_besoin = 'BAF-2612-9999' where id_besoin = 'BAF-2612-0001'$o$, true);
+select t('l''agence d''une ligne ne se modifie pas', 1, $o$update lignes_besoin set agence_code = 'KRI' where id_besoin = 'BAF-2612-0001'$o$, true);
+select t('un chef d''une autre agence tente de modifier une ligne de BAF', 7, $o$update lignes_besoin set designation = 'Piraté' where id_besoin = 'BAF-2612-0001'$o$, false);
+select t('... la ligne n''a pas changé', null, $o$do $x$ begin
+  if (select designation from lignes_besoin where id_besoin = 'BAF-2612-0001') = 'Piraté' then raise exception 'ligne modifiée par une autre agence'; end if; end $x$$o$, false);
+
 select t('le chef ajoute à nouveau une ligne puis la retire (jamais supprimée)', 1, $o$do $x$ begin
   insert into lignes_besoin(besoin_id,agence_code,cycle_id,code_parc,designation,quantite,prix_unitaire,priorite,justification)
     values (wf_besoin(),'BAF','2612','BAF-B02','Ligne éphémère',1,1000,'P3','test');
@@ -111,6 +127,8 @@ select t('statuts des lignes : 2 validées, 1 non validée avec motif', null, $o
      or (select motif_code from lignes_besoin where id_besoin = 'BAF-2612-0003') <> 'BUDGET'
      or (select montant_retenu from lignes_besoin where id_besoin = 'BAF-2612-0002') <> 150000
      or (select mode from lignes_besoin where id_besoin = 'BAF-2612-0002') <> 'MDI' then raise exception 'statuts'; end if; end $x$$o$, false);
+select t('plus de modification d''une ligne validée (chef)', 1, $o$update lignes_besoin set designation = 'Autre' where id_besoin = 'BAF-2612-0001'$o$, true);
+select t('plus de modification d''une ligne validée (responsable maintenance)', 2, $o$update lignes_besoin set prix_unitaire = 1 where id_besoin = 'BAF-2612-0002'$o$, true);
 select t('statut du besoin déduit : partiellement validé', null, $o$do $x$ begin
   if (select statut from v_besoins where id = wf_besoin()) <> 'PARTIELLEMENT_VALIDE' then raise exception '%', (select statut from v_besoins where id = wf_besoin()); end if; end $x$$o$, false);
 select t('la décision est tracée avec le détail', null, $o$do $x$ begin

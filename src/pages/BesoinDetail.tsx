@@ -1,6 +1,6 @@
 import { useMemo, useState, type FormEvent } from 'react'
 import { Link, useParams } from 'react-router-dom'
-import { ArrowLeft, Calculator, Plus, RotateCcw, Send, Trash2, Undo2 } from 'lucide-react'
+import { ArrowLeft, Calculator, Pencil, Plus, RotateCcw, Send, Trash2, Undo2 } from 'lucide-react'
 import { useAuth } from '../auth'
 import { supabase, erreur, STATUT_LABEL, MOTIFS_NON_VALIDATION, type Row } from '../lib/supabase'
 import { useCycle, useRefresh, useRows } from '../lib/data'
@@ -17,6 +17,7 @@ export default function BesoinDetail() {
   const refresh = useRefresh()
   const agir = useAction()
   const [ajout, setAjout] = useState(false)
+  const [edition, setEdition] = useState<Row | null>(null)
   const role = profile!.role
 
   const fiche = useRows(['besoin', id], () => supabase.from('v_besoins').select('*').eq('id', id!), !!id)
@@ -124,13 +125,14 @@ export default function BesoinDetail() {
                   {l.statut === 'NON_VALIDEE' && l.motif_code && <div>{MOTIFS_NON_VALIDATION.find(m => m[0] === l.motif_code)?.[1] ?? l.motif_code}</div>}
                 </td>
                 <td className="px-3 py-2 text-right whitespace-nowrap">
-                  {l.statut === 'BROUILLON' && peutSaisir && (
+                  {l.statut === 'BROUILLON' && peutSaisir && (<>
+                    <Button variant="ghost" aria-label={`Modifier ${l.id_besoin}`} onClick={() => setEdition(l)}><Pencil size={14} /></Button>
                     <Button variant="ghost" aria-label={`Retirer ${l.id_besoin}`} onClick={() => {
                       if (window.confirm(`Retirer la ligne ${l.id_besoin} ? Elle reste tracée mais ne compte plus.`))
                         agir(() => supabase.from('lignes_besoin').update({ statut: 'ABANDONNEE', motif_code: 'SAISIE_ERRONEE' }).eq('id_besoin', l.id_besoin),
                           `${l.id_besoin} retirée`, refresh)
                     }}><Trash2 size={14} /></Button>
-                  )}
+                  </>)}
                 </td>
               </tr>
             ))}
@@ -139,6 +141,7 @@ export default function BesoinDetail() {
       </Card>
 
       {ajout && <LigneForm besoin={b} onClose={() => setAjout(false)} onSaved={refresh} />}
+      {edition && <LigneForm besoin={b} ligne={edition} onClose={() => setEdition(null)} onSaved={refresh} />}
     </div>
   )
 }
@@ -252,9 +255,10 @@ function Mini({ label, valeur }: { label: string; valeur: string }) {
 
 const VIDE = { quantite: 1, prix_unitaire: 0, priorite: 'P2', type_intervention: 'Remise en service', securite_legale: false } as Row
 
-function LigneForm({ besoin, onClose, onSaved }: { besoin: Row; onClose: () => void; onSaved: () => void }) {
+// Création d'une ligne, ou modification d'une ligne encore en brouillon (prop `ligne`)
+function LigneForm({ besoin, ligne, onClose, onSaved }: { besoin: Row; ligne?: Row; onClose: () => void; onSaved: () => void }) {
   const toast = useToast()
-  const [f, setF] = useState<Row>(VIDE)
+  const [f, setF] = useState<Row>(ligne ?? VIDE)
   const set = (k: string, v: unknown) => setF(s => ({ ...s, [k]: v }))
 
   const parc = useRows(['parc', besoin.agence_code], () => supabase.from('parc').select('*').eq('agence_code', besoin.agence_code).order('code'))
@@ -271,14 +275,24 @@ function LigneForm({ besoin, onClose, onSaved }: { besoin: Row; onClose: () => v
 
   async function enregistrer(e: FormEvent, continuer: boolean) {
     e.preventDefault()
-    const { data, error } = await supabase.from('lignes_besoin').insert({
-      besoin_id: besoin.id, agence_code: besoin.agence_code, cycle_id: besoin.cycle_id,
-      code_parc: f.code_parc || null, etat_vehicule: vehicule?.etat ?? null, type_intervention: f.type_intervention,
+    const champs = {
+      code_parc: f.code_parc || null, etat_vehicule: vehicule?.etat ?? ligne?.etat_vehicule ?? null, type_intervention: f.type_intervention,
       ot_panne: f.ot_panne || null, reference: f.reference || null, designation: f.designation,
       quantite: Number(f.quantite), prix_unitaire: Number(f.prix_unitaire),
       fournisseur_id: f.fournisseur_id ? Number(f.fournisseur_id) : null, ref_devis: f.ref_devis || null,
       priorite: f.priorite, securite_legale: !!f.securite_legale, justification: f.justification || null,
-      justification_prix: f.justification_prix || null, statut: 'BROUILLON'
+      justification_prix: f.justification_prix || null
+    }
+    if (ligne) {
+      // modification d'un brouillon : l'identifiant, l'agence et le besoin ne changent pas
+      const { error } = await supabase.from('lignes_besoin').update(champs).eq('id_besoin', ligne.id_besoin)
+      if (error) return toast('err', erreur(error))
+      toast('ok', `Ligne ${ligne.id_besoin} modifiée`)
+      onSaved(); onClose()
+      return
+    }
+    const { data, error } = await supabase.from('lignes_besoin').insert({
+      besoin_id: besoin.id, agence_code: besoin.agence_code, cycle_id: besoin.cycle_id, ...champs, statut: 'BROUILLON'
     }).select('id_besoin').single()
     if (error) return toast('err', erreur(error))
     toast('ok', `Ligne ${data.id_besoin} ajoutée au besoin ${besoin.numero}`)
@@ -288,10 +302,12 @@ function LigneForm({ besoin, onClose, onSaved }: { besoin: Row; onClose: () => v
   }
 
   return (
-    <Modal title={`Nouvelle ligne — ${besoin.numero}`} onClose={onClose}>
+    <Modal title={ligne ? `Modifier la ligne ${ligne.id_besoin}` : `Nouvelle ligne — ${besoin.numero}`} onClose={onClose}>
       <form onSubmit={e => enregistrer(e, false)} className="grid sm:grid-cols-2 gap-4">
         <div className="sm:col-span-2 rounded-lg bg-brand-50 px-3 py-2 text-sm text-brand-900">
-          Cette ligne sera rattachée au besoin <strong>{besoin.libelle || besoin.numero}</strong> (agence {besoin.agence_code}, cycle {besoin.cycle_id}).
+          {ligne
+            ? <>Cette ligne est encore en brouillon : vous pouvez la modifier tant que le besoin <strong>{besoin.libelle || besoin.numero}</strong> n'est pas soumis.</>
+            : <>Cette ligne sera rattachée au besoin <strong>{besoin.libelle || besoin.numero}</strong> (agence {besoin.agence_code}, cycle {besoin.cycle_id}).</>}
         </div>
         <Field label="Véhicule (code parc)" hint={vehicule ? `État : ${vehicule.etat}` : undefined}>
           <select required className={inputCls} value={f.code_parc ?? ''} onChange={e => set('code_parc', e.target.value)}>
@@ -367,8 +383,8 @@ function LigneForm({ besoin, onClose, onSaved }: { besoin: Row; onClose: () => v
         </div>
         <div className="sm:col-span-2 flex flex-wrap justify-end gap-2">
           <Button type="button" variant="ghost" onClick={onClose}>Fermer</Button>
-          <Button type="button" variant="secondary" onClick={e => enregistrer(e as unknown as FormEvent, true)}>Enregistrer et ajouter une autre</Button>
-          <Button type="submit">Enregistrer</Button>
+          {!ligne && <Button type="button" variant="secondary" onClick={e => enregistrer(e as unknown as FormEvent, true)}>Enregistrer et ajouter une autre</Button>}
+          <Button type="submit">{ligne ? 'Enregistrer les modifications' : 'Enregistrer'}</Button>
         </div>
       </form>
     </Modal>
