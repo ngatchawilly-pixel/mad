@@ -20,7 +20,9 @@ export const BESOIN_STATUT: Record<string, [string, 'gris' | 'bleu' | 'vert' | '
 
 export default function Besoins() {
   const { profile } = useAuth()
-  const { cycle } = useCycle()
+  const { cycle, cycles, setCycle } = useCycle()
+  const infoCycle = cycles.find(c => c.id === cycle)
+  const clos = infoCycle?.statut === 'CLOTURE'
   const refresh = useRefresh()
   const navigate = useNavigate()
   const [nouveau, setNouveau] = useState(false)
@@ -39,13 +41,23 @@ export default function Besoins() {
           <p className="text-sm text-slate-500">Un besoin regroupe une ou plusieurs lignes. Créez ou ouvrez un besoin pour y ajouter ses lignes.</p>
         </div>
         <div className="flex gap-2">
-          {role === 'DML' && <Button variant="secondary" onClick={() => setImporter(true)}><FileSpreadsheet size={16} /> Importer Excel</Button>}
-          {peutCreer && <Button onClick={() => setNouveau(true)}><Plus size={16} /> Nouveau besoin</Button>}
+          {role === 'DML' && !clos && <Button variant="secondary" onClick={() => setImporter(true)}><FileSpreadsheet size={16} /> Importer Excel</Button>}
+          {peutCreer && !clos && <Button onClick={() => setNouveau(true)}><Plus size={16} /> Nouveau besoin</Button>}
         </div>
       </div>
 
+      {clos && (
+        <div role="status" className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-700 flex flex-wrap items-center justify-between gap-2">
+          <span>
+            Ce cycle est <strong>clôturé</strong> : ses besoins et ses MAD restent consultables, mais on n'y crée plus de besoin.
+            Vos besoins non validés et ceux encore en saisie ont été repris dans le cycle {infoCycle?.cycle_suivant}.
+          </span>
+          {infoCycle?.cycle_suivant && <Button variant="secondary" onClick={() => setCycle(infoCycle.cycle_suivant)}>Aller au cycle {infoCycle.cycle_suivant}</Button>}
+        </div>
+      )}
+
       <Card>
-        {(besoins.data ?? []).length === 0 ? <Empty>Aucun besoin dans ce cycle. Créez-en un pour commencer.</Empty> : (
+        {(besoins.data ?? []).length === 0 ? <Empty>{clos ? 'Aucun besoin dans ce cycle.' : 'Aucun besoin dans ce cycle. Créez-en un pour commencer.'}</Empty> : (
           <Table head={['Besoin', 'Agence', 'Libellé', 'Service', 'Lignes', 'Montant', 'Statut', 'Créé le']}>
             {besoins.data!.map(b => {
               const [libelle, ton] = BESOIN_STATUT[b.statut] ?? [b.statut, 'gris']

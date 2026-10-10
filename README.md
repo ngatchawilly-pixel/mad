@@ -24,7 +24,7 @@ Les autres comptes se créent ensuite avec leur rôle (CHEF, RM, DML, CG, DG, TR
 `supabase/tests/test_catalogue.sql` couvre le catalogue fournisseurs.
 `supabase/tests/test_comptes.sql` couvre les mots de passe. Toute la suite : `bash supabase/tests/lancer_tests.sh` (Docker).
 `supabase/tests/test_workflow.sql` couvre le circuit au niveau du besoin.
-Dernier résultat : 226 scénarios réussis (45 + 28 + 9 + 18 + 12 + 23 + 31 + 60), 0 échec.
+Dernier résultat : 239 scénarios réussis (45 + 41 + 9 + 18 + 12 + 23 + 31 + 60), 0 échec.
 
 ## Règles à valider (voir l'analyse du cahier des charges)
 - `seuil_reaf_dg` (2 000 000 FCFA) est **provisoire** : le cahier des charges ne le chiffre pas.
@@ -69,3 +69,10 @@ comparaison entre fournisseurs. Modèle Excel : `public/modeles/Modele_fournisse
    (tout ou rien). Chaque ligne en attente doit recevoir une décision.
 3. L'agence peut **réexprimer** les lignes non retenues (hors « reporté » et « sacrifié », qui reviennent au cycle suivant).
 Les anciennes voies ligne par ligne (soumission, validation) sont verrouillées côté base.
+
+## Cycle de besoins et MAD
+Le cycle regroupe les besoins **et** les MAD. L'agence crée ses besoins dans le cycle ouvert ; la DML les valide ; les MAD sont générées.
+La DML **clôture le cycle** (page Clôture) : il faut que tous les besoins soumis soient décidés et que toutes les lignes validées aient leur MAD.
+À la clôture, **le cycle suivant s'ouvre automatiquement** avec tous les besoins non validés (lignes réexprimées, même identifiant) et les besoins encore en saisie.
+Les besoins validés et les MAD restent dans le cycle clos, dont le suivi financier continue (virement, dépenses, compte d'emploi).
+La **clôture financière** (procès-verbal signé DML, CG, DG) se fait ensuite : lignes réalisées clôturées, lignes financées non dépensées reportées dans le cycle ouvert.

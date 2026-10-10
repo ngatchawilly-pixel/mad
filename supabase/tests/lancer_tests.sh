@@ -10,15 +10,14 @@ run() { docker exec -i $C psql -U postgres -v ON_ERROR_STOP=1 -q "$@"; }
 run < supabase/tests/stub_auth.sql || exit 1
 for f in supabase/migrations/*.sql supabase/seed.sql; do run < "$f" || { echo "ÉCHEC migration $f"; exit 1; }; done
 total=0; echec=0
-for t in regles cloture import besoins; do
-  r=$(docker exec -i $C psql -U postgres -q -A -F ' ' < supabase/tests/test_$t.sql 2>&1 | grep -A1 '^pass' | tail -1)
-  echo "test_$t : $r"; set -- $r; total=$((total+$1)); echec=$((echec+$2))
-done
+joue() {
+  out=$(docker exec -i $C psql -U postgres -q -A -F ' | ' < supabase/tests/test_$1.sql 2>&1)
+  r=$(echo "$out" | grep -A1 '^pass' | tail -1 | tr -d '|'); echo "test_$1 : $r"
+  set -- $r; total=$((total+$1)); echec=$((echec+$2))
+  echo "$out" | grep -E '^[0-9]+ \| FAIL' | cut -c1-260
+}
+for t in regles cloture import besoins; do joue $t; done
 run < supabase/seed_referentiels.sql
-for t in referentiels catalogue comptes workflow; do
-  out=$(docker exec -i $C psql -U postgres -q -A -F ' | ' < supabase/tests/test_$t.sql 2>&1)
-  r=$(echo "$out" | grep -A1 '^pass' | tail -1 | tr -d '|'); echo "test_$t : $r"; set -- $r; total=$((total+$1)); echec=$((echec+$2))
-  echo "$out" | grep -E '^[0-9]+ \| FAIL' 
-done
+for t in referentiels catalogue comptes workflow; do joue $t; done
 echo "TOTAL : $total réussis, $echec échec(s)"
 docker rm -f $C >/dev/null 2>&1

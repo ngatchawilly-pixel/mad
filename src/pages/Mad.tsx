@@ -8,7 +8,7 @@ import { Badge, Button, Card, Empty, Field, Table, inputCls, useAction } from '.
 
 export default function Mad() {
   const { profile } = useAuth()
-  const { cycle } = useCycle()
+  const { cycle, cycles } = useCycle()
   const refresh = useRefresh()
   const agir = useAction()
   const role = profile!.role
@@ -20,7 +20,12 @@ export default function Mad() {
     <div className="space-y-4">
       <h1 className="text-xl font-semibold text-slate-900">Mises à disposition — cycle {cycle}</h1>
 
-      {role === 'DML' && <Generer cycle={cycle} onDone={refresh} />}
+      {cycles.find(c => c.id === cycle)?.statut === 'CLOTURE' && (
+        <div role="status" className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-700">
+          Ce cycle de besoins est clôturé : ses MAD restent rattachées à ce cycle et leur suivi financier continue (virement, dépenses, compte d'emploi).
+        </div>
+      )}
+      {role === 'DML' && cycles.find(c => c.id === cycle)?.statut !== 'CLOTURE' && <Generer cycle={cycle} onDone={refresh} />}
 
       <Card title={`MAD établies (${mads.data?.length ?? 0})`}>
         {(mads.data ?? []).length === 0 ? <Empty>Aucune MAD pour ce cycle.</Empty> : (

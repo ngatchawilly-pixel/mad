@@ -1,6 +1,6 @@
 import { useMemo, useState, type FormEvent } from 'react'
 import { Link, useParams } from 'react-router-dom'
-import { ArrowLeft, Calculator, Pencil, Plus, RotateCcw, Send, Trash2, Undo2 } from 'lucide-react'
+import { ArrowLeft, Calculator, Pencil, Plus, Send, Trash2, Undo2 } from 'lucide-react'
 import { useAuth } from '../auth'
 import { supabase, erreur, STATUT_LABEL, MOTIFS_NON_VALIDATION, type Row } from '../lib/supabase'
 import { useCycle, useRefresh, useRows } from '../lib/data'
@@ -44,7 +44,7 @@ export default function BesoinDetail() {
 
   const estChef = role === 'CHEF'
   const peutSaisir = ['CHEF', 'RM', 'DML'].includes(role) && enSaisie
-  const reexprimables = toutes.filter(l => l.statut === 'NON_VALIDEE' && !['REPORTE', 'SACRIFIE'].includes(l.motif_code ?? ''))
+  const nonValidees = toutes.filter(l => l.statut === 'NON_VALIDEE')
 
   return (
     <div className="space-y-4">
@@ -72,12 +72,6 @@ export default function BesoinDetail() {
               <Undo2 size={16} /> Rappeler le besoin
             </Button>
           )}
-          {estChef && decide && cycleOuvert && reexprimables.length > 0 && (
-            <Button variant="secondary" onClick={() => agir(() => supabase.rpc('reexprimer_besoin', { p_besoin: b.id }),
-              `${reexprimables.length} ligne(s) réexprimée(s), besoin soumis à nouveau`, refresh)}>
-              <RotateCcw size={16} /> Réexprimer les lignes non retenues ({reexprimables.length})
-            </Button>
-          )}
         </div>
       </div>
 
@@ -90,6 +84,11 @@ export default function BesoinDetail() {
       )}
       {soumis && (role === 'CHEF' || role === 'RM') && (
         <div className="rounded-xl border border-sky-200 bg-sky-50 px-4 py-3 text-sm text-sky-900">Ce besoin est soumis : il est en attente de la décision de la DML.</div>
+      )}
+      {decide && cycleOuvert && nonValidees.length > 0 && (
+        <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
+          {nonValidees.length} ligne(s) non retenue(s) : elles passeront <strong>automatiquement dans le cycle suivant</strong> à la clôture du cycle {b.cycle_id}, sans nouvelle saisie.
+        </div>
       )}
 
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
